@@ -1,0 +1,129 @@
+---
+title: "Pràctica 5"
+subtitle: "Rutinas de sueño en universitarios"
+date: today
+author: Miquel Àngel Llauger Suau
+format:
+  html:
+    theme: lumen
+    toc: true
+    toc-depth: 3
+Rendering:
+    embed-resources: true
+---
+
+[Enlace al Repositorio](https://github.com/MiquelAngelLlauger/Practica_5_AD.git)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r, echo=FALSE, include=FALSE, eval=TRUE}
+library(tidyverse) #Poned aquí todas las librerías que utilicéis
+library(readr)
+library(dplyr)
+library(ggcorrplot)
+library(GGally)
+library(MASS)
+datos_empresa <- read_csv("~/R_2024/Practica_3_AD/datos_empresa.csv")
+```
+
+## Resumen
+
+### Objetivos
+
+Vamos a crear y analizar un conjunto de datos que giran entorno a las **rutinas y calidad del sueño en jóvenes universitarios**. Nuestro principal objetivo es dilucidar la posible relación entre
+
+### Planteamiento y metodología
+
+Para ello, crearemos un conjunto de más de 100 estudiantes y las siguientes variables:
+
+**Variables Cuantitativas**:
+
+-   Horas de estudio diarias
+-   Duración media del sueño
+-   Horas de consumo de pantallas
+-   Actividad física
+
+**Variables nominales**:
+
+-   Género: "Male", "Female", "Other".
+-   Año universitario: "Primero", "Segundo", "Tercero", "Cuarto".
+
+**Variables ordinales**:
+
+-   **Índice de calidad del sueño**: Aquí creamos una escala del 1-10 y lo agrupamos en 4 niveles: "Bajo", "Medio-Bajo", "Medio-Alto", "Bueno".
+-   Consumo de **cafeína**: tenemos los 4 niveles "Nulo" -no consume cafeína-, "Bajo"-No consume regularmente-, "Medio" -1/2 cafés diarios-, "Alto" -Más de 2 cafés al día-.
+-   **Frecuencia ocio nocturno**: 3 niveles: "Esporádicamente", "Semanalmente" y "Varias veces" -más de una vez por semana-.
+
+```{r}
+# Per les variables quantitatives:
+mitjanes <- c(6.8,6.5,2.5,45)
+covariances <- matrix(c(1,0.627,0.544,0.534
+,0.627,3,0.590,0.551,0.544,0.590,1.5,0.611,0.534,0.551,0.611,15), nrow = 4,ncol = 4)
+
+dades_numeriques <- mvrnorm(100, mu=mitjanes, Sigma = covariances)
+
+
+gendre <- sample(c("Male","Female","Other"), size=100, prob = c(0.499,0.499,0.002), replace = TRUE)
+
+any <- sample(c("1st Year", "2nd Year", "3rd Year", "4th Year"), size =100, replace = TRUE)
+
+cafe <- ordered(sample(c("Nulo", "Bajo", "Medio", "Alto"), 600, prob = c(0.2,0.3,0.4,0.1), replace = TRUE))
+
+oci_nocturn <- ordered(sample(c("Esporádicamente", "Semanalmente", "Varias veces"), 600, prob = c(0.2,0.5,0.3), replace = TRUE),levels = c("Esporádicamente", "Semanalmente", "Varias veces"))
+
+calidad <- ordered(sample(c("Mala", "Media-Baja", "Media-Alta","Buena"), 100, prob = c(0.2,0.4,0.25,0.15), replace = TRUE), levels = c("Mala", "Media-Baja", "Media-Alta","Buena"))
+
+dades <- read_csv("student_sleep_patterns[1].csv")
+
+
+
+score <- dades %>% mutate(Sleep_Quality=case_when(
+  Sleep_Quality==1~"Mala",
+  Sleep_Quality==2~"Mala",
+  Sleep_Quality==3~"Mala",
+  Sleep_Quality==4~"Media-Baja",
+  Sleep_Quality==5~"Media-Baja",
+  Sleep_Quality==6~"Media-Alta",
+  Sleep_Quality==7~"Media-Alta",
+  Sleep_Quality==8~"Buena",
+  Sleep_Quality==9~"Buena",
+  Sleep_Quality==10~"Buena",
+))
+
+score <- score$Sleep_Quality
+score <- ordered(score, levels = c("Mala", "Media-Baja", "Media-Alta","Buena"))
+
+score_final = c(score, calidad)
+
+noms = c("Gendre","Academic Year","Sleeping_time","Study time", "Screen time", "Physical act", "Caffeine", "Nocturnal activity", "Sleep quality")
+
+
+
+dormir <- c(dades$Sleep_Duration,dades_numeriques[,1])
+study <- c(dades$Study_Hours, dades_numeriques[,2])
+screen <- c(dades$Screen_Time, dades_numeriques[,3])
+physical <- c(dades$Physical_Activity, dades_numeriques[,4])
+gendre <- c(dades$Gender, gendre)
+any_uni <- c(dades$University_Year, any)
+
+
+rutinas_sueno <- data.frame(
+  Gendre = gendre, 
+  Academic_year = any_uni,
+  Sleeping_time = dormir, 
+  Study_time = study,
+  Screen_time = screen, 
+  Physical_act = physical, 
+  Caffeine = cafe,
+  Nocturnitat = oci_nocturn, 
+  Sleep_Quality = score_final
+  
+  
+)
+
+head(rutinas_sueno)
+
+
+```
