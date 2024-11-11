@@ -1,6 +1,6 @@
 ---
-title: "Pràctica 5"
-subtitle: "Rutinas de sueño en universitarios"
+title: "Rutinas de sueño en universitarios"
+subtitle: "Practica 5"
 date: today
 author: Miquel Àngel Llauger Suau
 format:
@@ -56,29 +56,30 @@ Para ello, crearemos un conjunto de más de 100 estudiantes y las siguientes var
 -   Consumo de **cafeína**: tenemos los 4 niveles "Nulo" -no consume cafeína-, "Bajo"-No consume regularmente-, "Medio" -1/2 cafés diarios-, "Alto" -Más de 2 cafés al día-.
 -   **Frecuencia ocio nocturno**: 3 niveles: "Esporádicamente", "Semanalmente" y "Varias veces" -más de una vez por semana-.
 
+## Análisis descriptivo de la base de datos
+
+Nuestra base de datos estará compuesta por unas primeras 100 observaciones de creación propia, con el uso de la función "sample". Las cuatro variables cuantitativas seguirán una distribución Normal Multivariante y el resto han sido generadas de manera más o menos aleatoria:
+
 ```{r}
 # Per les variables quantitatives:
 mitjanes <- c(6.8,6.5,2.5,45)
-covariances <- matrix(c(1,0.627,0.544,0.534
-,0.627,3,0.590,0.551,0.544,0.590,1.5,0.611,0.534,0.551,0.611,15), nrow = 4,ncol = 4)
+covariances <- matrix(c(6.8,4,-2,0,4,6.5,0,0,-2,0,1.5,0,0,0,0,45
+), nrow = 4,ncol = 4)
 
-dades_numeriques <- mvrnorm(100, mu=mitjanes, Sigma = covariances)
+dades_numeriques <- mvrnorm(500, mu=mitjanes, Sigma = covariances)
 
+gendre <- sample(c("Male","Female","Other"), size=500, prob = c(0.499,0.499,0.002), replace = TRUE)
 
-gendre <- sample(c("Male","Female","Other"), size=100, prob = c(0.499,0.499,0.002), replace = TRUE)
+anys <- sample(c("1st Year", "2nd Year", "3rd Year", "4th Year"), size =500, prob = c(0.3,0.3,0.25,0.15), replace = TRUE)
 
-any <- sample(c("1st Year", "2nd Year", "3rd Year", "4th Year"), size =100, replace = TRUE)
+oci_nocturn <- ordered(sample(c("Esporádicamente", "Semanalmente", "Varias veces"), 500, prob = c(0.2,0.5,0.3), replace = TRUE),levels = c("Esporádicamente", "Semanalmente", "Varias veces"))
 
-cafe <- ordered(sample(c("Nulo", "Bajo", "Medio", "Alto"), 600, prob = c(0.2,0.3,0.4,0.1), replace = TRUE))
+```
 
-oci_nocturn <- ordered(sample(c("Esporádicamente", "Semanalmente", "Varias veces"), 600, prob = c(0.2,0.5,0.3), replace = TRUE),levels = c("Esporádicamente", "Semanalmente", "Varias veces"))
+Estas 100 observaciones han sido **complementadas** con el dataset "**Student Sleep Patterns**" ubicado en la web [kaggle](https://www.kaggle.com/datasets/arsalanjamal002/student-sleep-patterns/data). Consta de otras 500 observaciones en estudiantes que nos dan un punto de vista más realista. De este dataset utilizaremos algunas de sus variables, de tal manera que al final, nos quedaran **600 observaciones**:
 
-calidad <- ordered(sample(c("Mala", "Media-Baja", "Media-Alta","Buena"), 100, prob = c(0.2,0.4,0.25,0.15), replace = TRUE), levels = c("Mala", "Media-Baja", "Media-Alta","Buena"))
-
+```{r, include=FALSE, echo=FALSE}
 dades <- read_csv("student_sleep_patterns[1].csv")
-
-
-
 score <- dades %>% mutate(Sleep_Quality=case_when(
   Sleep_Quality==1~"Mala",
   Sleep_Quality==2~"Mala",
@@ -91,39 +92,148 @@ score <- dades %>% mutate(Sleep_Quality=case_when(
   Sleep_Quality==9~"Buena",
   Sleep_Quality==10~"Buena",
 ))
-
 score <- score$Sleep_Quality
 score <- ordered(score, levels = c("Mala", "Media-Baja", "Media-Alta","Buena"))
 
-score_final = c(score, calidad)
-
-noms = c("Gendre","Academic Year","Sleeping_time","Study time", "Screen time", "Physical act", "Caffeine", "Nocturnal activity", "Sleep quality")
 
 
+score_c <- dades %>% mutate(Caffeine_Intake=case_when(
+  Caffeine_Intake==0~"Nunca",
+  Caffeine_Intake==1~"Estándar",
+  Caffeine_Intake==2~"Estándar",
+  Caffeine_Intake>=3~"Alto",
+))
 
-dormir <- c(dades$Sleep_Duration,dades_numeriques[,1])
-study <- c(dades$Study_Hours, dades_numeriques[,2])
-screen <- c(dades$Screen_Time, dades_numeriques[,3])
-physical <- c(dades$Physical_Activity, dades_numeriques[,4])
-gendre <- c(dades$Gender, gendre)
-any_uni <- c(dades$University_Year, any)
+score_c <- score_c$Caffeine_Intake
 
+score_c <- ordered(score_c, levels = c("Nunca", "Estándar", "Alto"))
 
 rutinas_sueno <- data.frame(
   Gendre = gendre, 
-  Academic_year = any_uni,
-  Sleeping_time = dormir, 
-  Study_time = study,
-  Screen_time = screen, 
-  Physical_act = physical, 
-  Caffeine = cafe,
+  Academic_year = anys,
+  Sleeping_time = round(dades_numeriques[,1],1),
+  Study_time = round(dades_numeriques[,2],1),
+  Screen_time = round(dades_numeriques[,3],1),
+  Physical_act =round(dades_numeriques[,4],1),
+  Caffeine = score_c,
   Nocturnitat = oci_nocturn, 
-  Sleep_Quality = score_final
-  
+  Sleep_Quality = score
   
 )
+view(rutinas_sueno)
 
-head(rutinas_sueno)
+```
+
+```{r}
+glimpse(rutinas_sueno)
+```
+
+En referencia a nuestras cuatro variables cuantitativas, podemos calcular su matriz de covarianzas y luego obtener así las siguientes magnitudes: **Varianza generalizada**:
+
+```{r, echo=FALSE}
+mat_normals<- matrix(c(rutinas_sueno$Sleeping_time,rutinas_sueno$Study_time,rutinas_sueno$Screen_time,rutinas_sueno$Physical_act), nrow = 500,ncol = 4)
 
 
+mitjanes <- colMeans(mat_normals)
+mitjanes <- matrix(rep(mitjanes, each = 500), ncol=4, byrow = FALSE)
+mat_cent <- mat_normals-mitjanes
+
+covar <- (1/500)*t(mat_cent)%*%mat_cent
+
+det(covar)
+
+
+
+```
+
+**Variación total**:
+
+```{r, echo=FALSE}
+Va<-eigen(covar)$values
+
+#Variació total:
+f=1
+for (e in Va){
+  f=f+e
+  
+}
+Var_tot<-f
+f
+
+```
+
+**Coeficiente de dependencia**:
+
+```{r}
+#Coeficient de dependència:
+1-det(cor(mat_normals))
+```
+
+## Aproximación multinomial
+
+En este apartado, queremos ver cual es la "proporción" entre niveles de calidad de sueño entre los estudiantes. Para ello, vamos a suponer que nuestra variable "score" del sueño sigue una distribución multinomial que puede tomar valores:
+
+-   "Mala" con probabilidad $p_{1}$
+-   "Media-Baja" con probabilidad $p_{2}$
+-   "Media-Alta" con probabilidad $p_{3}$
+-   "Buena" con probabilidad $p_{4}$
+
+Al tratar-se de una distribución **multinomial**, el **estimador máximo verosímil** de las probabilidades $p_{i}$ no es más que el vector de frecuencias $\frac{f_{i}}{n}$, fácilmente calculable con R:
+
+```{r}
+#Usaremos la función sum 
+bajo <- sum(rutinas_sueno$Sleep_Quality == "Mala")
+Media_baja <- sum(rutinas_sueno$Sleep_Quality == "Media-Baja")
+Media_alta <- sum(rutinas_sueno$Sleep_Quality == "Media-Alta")
+buena <- sum(rutinas_sueno$Sleep_Quality == "Buena")
+bajo/500
+Media_baja/500
+Media_alta/500
+buena/500
+
+```
+
+## Regresión lineal múltiple
+
+Para establecer una relación lineal entre la **Duración del sueño** de nuestros estudiantes y el resto de variables cuantitativas, vamos a ajustar un modelo de regresión lineal múltiple de la forma: $$X_1=Y=\beta_0+\beta_2 X_2+ \beta_3 X_3 +\beta_4 X_4 +\epsilon$$ Para ello, uaremos herramientas de R para estimar los coeficientes por el método de mínimos cuadrados:
+
+```{r}
+Y = mat_normals[,1]
+X_2 = mat_normals[,2]
+X_3 = mat_normals[,3]
+X_4 = mat_normals[,4]
+
+summary(lm(Y~X_2 + X_3 + X_4))
+
+
+
+```
+
+Aquí hemos obtenido el valor de los coeficientes:
+
+-   $\beta_0=6.167701$
+-   $\beta_1=0.625130$
+-   $\beta_2=-1.338642$
+-   $\beta_3=-0.001896$
+
+Y también el error estándar $\sigma^2=1.284$. Aquí vemos que para predecir la longitud en horas del sueño de nuestros estudiantes, el coeficiente $\beta_2$ nos dice que **las horas de consumo de pantallas penalizan negativamente** la longitud del sueño. Al contrario que, con $\beta_1$, que establece una relación directa entre las horas de dedicación al estudio y la longitud del sueño.
+
+Para calcular el score de nuestra muestra, consideremos nuestro problema lineal:
+
+$$\mathbf{y} = \mathbf{X} \boldsymbol{\beta} + \boldsymbol{\epsilon}$$
+Y la función de verosimilitud, asumiendo normalidad en la distribución de los errores:
+
+
+$$L(\boldsymbol{\beta}, \sigma^2) = \prod_{i=1}^{n} \frac{1}{\sqrt{2 \pi \sigma^2}} \exp \left( -\frac{(y_i - \mathbf{x}_i^T \boldsymbol{\beta})^2}{2 \sigma^2} \right)$$
+Tomando el logaritmo de la previa función y derivando, obtenemos la función de score, que no es más que el logaritmo del gradiente de la verosimilitud:
+
+$$\frac{\partial \ell}{\partial \boldsymbol{\beta}} = \frac{1}{\sigma^2} \mathbf{X}^T (\mathbf{y} - \mathbf{X} \boldsymbol{\beta})$$
+
+```{r}
+beta = c(6.167701,0.625130,-1.338642,-0.001896)
+sigma = 1.284
+intercept=rep(1,each=500)
+X = cbind(intercept,X_2,X_3,X_4)
+#Score function: gradient del logaritme de la  funció de versemblança
+(1/sigma)*t(X)%*%(Y-X%*%beta)
 ```
