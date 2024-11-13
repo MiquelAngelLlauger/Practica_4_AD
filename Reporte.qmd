@@ -25,6 +25,7 @@ library(dplyr)
 library(ggcorrplot)
 library(GGally)
 library(MASS)
+library(Hotelling)
 datos_empresa <- read_csv("~/R_2024/Practica_3_AD/datos_empresa.csv")
 ```
 
@@ -63,8 +64,9 @@ Nuestra base de datos estará compuesta por unas primeras 100 observaciones de c
 ```{r}
 # Per les variables quantitatives:
 mitjanes <- c(6.8,6.5,2.5,45)
-covariances <- matrix(c(6.8,4,-2,0,4,6.5,0,0,-2,0,1.5,0,0,0,0,45
+covariances <- matrix(c(6,4,-2,0,4,6.5,0,0,-2,0,1.5,0,0,0,0,45
 ), nrow = 4,ncol = 4)
+covariances
 
 dades_numeriques <- mvrnorm(500, mu=mitjanes, Sigma = covariances)
 
@@ -203,37 +205,95 @@ X_2 = mat_normals[,2]
 X_3 = mat_normals[,3]
 X_4 = mat_normals[,4]
 
-summary(lm(Y~X_2 + X_3 + X_4))
-
-
+regressio <- summary(lm(Y~X_2 + X_3 + X_4))
+regressio
+coef = c(coefficients(regressio)[1:4])
+error = regressio$sigma
 
 ```
 
-Aquí hemos obtenido el valor de los coeficientes:
+Aquí hemos obtenido el valor de los coeficientes y del error estándar respectivamente: 
 
--   $\beta_0=6.167701$
--   $\beta_1=0.625130$
--   $\beta_2=-1.338642$
--   $\beta_3=-0.001896$
+```{r}
+coef
+error
 
-Y también el error estándar $\sigma^2=1.284$. Aquí vemos que para predecir la longitud en horas del sueño de nuestros estudiantes, el coeficiente $\beta_2$ nos dice que **las horas de consumo de pantallas penalizan negativamente** la longitud del sueño. Al contrario que, con $\beta_1$, que establece una relación directa entre las horas de dedicación al estudio y la longitud del sueño.
+```
+
+Aquí vemos que para predecir la longitud en horas del sueño de nuestros estudiantes, el coeficiente $\beta_2$ nos dice que **las horas de consumo de pantallas penalizan negativamente** la longitud del sueño. Al contrario que, con $\beta_1$, que establece una relación directa entre las horas de dedicación al estudio y la longitud del sueño.
 
 Para calcular el score de nuestra muestra, consideremos nuestro problema lineal:
 
-$$\mathbf{y} = \mathbf{X} \boldsymbol{\beta} + \boldsymbol{\epsilon}$$
-Y la función de verosimilitud, asumiendo normalidad en la distribución de los errores:
+$$\mathbf{y} = \mathbf{X} \boldsymbol{\beta} + \boldsymbol{\epsilon}$$ Y la función de verosimilitud, asumiendo normalidad en la distribución de los errores:
 
+$$L(\boldsymbol{\beta}, \sigma^2) = \prod_{i=1}^{n} \frac{1}{\sqrt{2 \pi \sigma^2}} \exp \left( -\frac{(y_i - \mathbf{x}_i^T \boldsymbol{\beta})^2}{2 \sigma^2} \right)$$ Tomando el logaritmo de la previa función y derivando, obtenemos la función de score, que no es más que el logaritmo del gradiente de la verosimilitud:
 
-$$L(\boldsymbol{\beta}, \sigma^2) = \prod_{i=1}^{n} \frac{1}{\sqrt{2 \pi \sigma^2}} \exp \left( -\frac{(y_i - \mathbf{x}_i^T \boldsymbol{\beta})^2}{2 \sigma^2} \right)$$
-Tomando el logaritmo de la previa función y derivando, obtenemos la función de score, que no es más que el logaritmo del gradiente de la verosimilitud:
-
-$$\frac{\partial \ell}{\partial \boldsymbol{\beta}} = \frac{1}{\sigma^2} \mathbf{X}^T (\mathbf{y} - \mathbf{X} \boldsymbol{\beta})$$
-
-```{r}
-beta = c(6.167701,0.625130,-1.338642,-0.001896)
-sigma = 1.284
+$$\frac{\partial \ell}{\partial \boldsymbol{\beta}} =\frac{1}{\sigma^2} \sum_{i=1}^{n}\mathbf{x_{i}}({y_{i}-\mathbf{x_{i}}^{t}\beta})= \frac{1}{\sigma^2} \mathbf{X}^T (\mathbf{y} - \mathbf{X} \boldsymbol{\beta})$$
+Efectuamos el cálculo con R: 
+```{r, echo=FALSE}
 intercept=rep(1,each=500)
 X = cbind(intercept,X_2,X_3,X_4)
 #Score function: gradient del logaritme de la  funció de versemblança
-(1/sigma)*t(X)%*%(Y-X%*%beta)
+(1/error)*t(X)%*%(Y-X%*%coef)
 ```
+Obtenemos una función de score vectorial (porque estamos estimando 4 parámetos) y de números muy pequeños. En efecto este es un muy buen resultado porque significa que **estamos cerca de un máximo local** en la función de verosimilitud. Es decir, que las soluciones són óptimas. Es decir, que la variable de la **longitud de periodos de sueño** se explica muy bien a través del resto de variables cuantitativas de manera lineal. Como habíamos observado antes, largos períodos de consumo de pantallas afectan negativamente a la longitud del sueño. Mientras que, aquellos estudiantes que dedican más horas al estudio, consiguen conciliaciones de sueño más largas. No podemos decir nada de la actividad física (de momento). 
+
+## Constraste de hipótesis
+
+Consideremos la variable: $Z=(X_{1},X_{2})$ normal multivariante formada por la duración del sueño ($X_{1}$) y el tiempo de dedicación al estudio (X_{2}). Y los niveles de "Ocio nocturno": Esporádicamente, Semanalmente y Varias veces a la semana. Queremos ver si hay una discrepancia o no entre los respectivos vectores de medias. 
+Supongamos que las observaciones de nuestra muestra són independientes, queremos ver si aquellos que disfrutan del ocio nocturno "Varias veces a la semana" presentan un vector de medias diferente al resto de población. 
+Consideremos los subdatasets correspondientes, 
+
+```{r, echo=FALSE, include=TRUE}
+#Ús de la funció filter de dyplr
+
+Z <- rutinas_sueno %>% dplyr::select(Sleeping_time,Study_time, Nocturnitat)
+
+Z_1 <- Z %>% filter(Nocturnitat == "Esporádicamente" | Nocturnitat == "Semanalmente")
+Z_2 <- Z %>% filter(Nocturnitat == "Varias veces")
+glimpse(Z_1)
+glimpse(Z_2)
+
+```
+$$\begin{align}
+  &H_0 : \begin{pmatrix} \mu_{1} \\ \mu_{2} \end{pmatrix}=\begin{pmatrix} \mu_{3} \\ \mu_{4} \end{pmatrix} \\
+  &H_1 = \mu_{1}\neq\mu_{3}  | \mu_{2}\neq\mu_{4} 
+  
+\end{align}$$
+
+Como vamos a realizar el contraste de hipótesis? 
+Supongamos que la matriz de covarianzas (o la submatriz correspondiente) $\Sigma$ es **desconocida**. Con la distribución **Hotelling**, que generaliza la T de Student. Consideremos el estadístico: $$\frac{n_{1}n_{2}}{n_{1}+n_{2}} \left( \bar{y} - \bar{x} \right)^\top S^{-1} \left( \bar{y} - \bar{x} \right) \sim T^2(p, n_{1} + n_{2} - 2)$$
+En dónde $S = \frac{n_{1}S_{1}+n_{2}S}{n_{1}+n_{2}-2}$ es la estimación **centrada** de $\Sigma$. Sabemos que $T$ sigue una distribución de **Hotelling** con $n_{1} + n_{2} - 2$ grados de libertad. 
+
+```{r, include=TRUE}
+n1 = 340
+n2 = 160
+x <- Z_1 %>% dplyr::summarise(x_1 = mean(Sleeping_time), x_2 = mean(Study_time))
+
+y <- Z_2 %>% dplyr::summarise(y_1 = mean(Sleeping_time), y_2 = mean(Study_time))
+x <- as.numeric(x)
+y <- as.numeric(y)
+
+
+A1 <- Z_1 %>% dplyr::select(Sleeping_time, Study_time)
+A1 = as.matrix(A1)
+S1 <- cov(A1)
+A2 <- Z_2 %>% dplyr::select(Sleeping_time, Study_time)
+A2 = as.matrix(A2)
+S2 <- cov(A2)
+
+
+S<- (1/(n1+n2-2))*(n1*S1 + n2*S2)
+
+
+
+T_2 <- (n1*n2/(n1+n2))*(y-x)%*%solve(S)%*%as.matrix(y-x)
+T_2
+print(hotelling.test(A1, A2))
+
+```
+```{r}
+
+
+```
+
